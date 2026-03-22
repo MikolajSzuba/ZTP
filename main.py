@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from web.routes import router
+from app.REST.web.routes import router
 
 app = FastAPI(title="Projekt 1 - Products REST API")
 app.include_router(router)

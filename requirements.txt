@@ -3,5 +3,6 @@ uvicorn
 sqlalchemy
 pydantic
 pydantic[email]
-psycopg[binary]
-
+psycopg[binary] 
+pytest
+httpx
