@@ -1,11 +1,52 @@
 import uuid
+import os
+import sys
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import insert
 from sqlalchemy import event
+
+# Ensure tests can import `main` when pytest runs from parent directory.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Use local sqlite database for tests to avoid external DB dependency.
+os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+# Avoid background worker thread in tests.
+os.environ["DISABLE_NOTIFICATION_WORKER"] = "1"
 
 from main import app
 from app.REST.data.database import engine, get_db, SessionLocal
+from app.REST.model.banned_names_orm import BannedNamesORM
+from app.REST.model.category_orm import CategoryORM
+from app.REST.model.product_history_orm import ProductHistoryORM
+from app.REST.model.product_orm import ProductORM
+from app.REST.data.database import Base
+
+
+@pytest.fixture(scope="session", autouse=True)
+def prepare_test_database():
+	Base.metadata.drop_all(bind=engine)
+	Base.metadata.create_all(bind=engine)
+	with SessionLocal() as db:
+		db.execute(
+			insert(CategoryORM),
+			[
+				{"id": 1, "name": "Elektronika"},
+				{"id": 2, "name": "Spozywcze"},
+				{"id": 3, "name": "Meble"},
+			],
+		)
+		db.execute(
+			insert(BannedNamesORM),
+			[
+				{"name": "Zakazany produkt"},
+				{"name": "Nielegalne"},
+				{"name": "Fake"},
+			],
+		)
+		db.commit()
+	yield
+	Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture(scope="function")

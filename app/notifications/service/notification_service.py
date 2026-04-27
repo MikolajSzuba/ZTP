@@ -1,3 +1,5 @@
+import secrets
+
 from sqlalchemy.orm import Session
 
 from app.notifications.data.notification_repository import (
@@ -9,6 +11,7 @@ from app.notifications.data.notification_repository import (
 from app.notifications.model.notification_orm import NotificationORM
 from app.notifications.model.notification_schema import NotificationCreate
 from app.notifications.model.notification_status import NotificationStatus
+from app.notifications.service.notification_dispatcher import dispatch_notification
 from app.notifications.service.notification_state_machine import can_transition
 from app.notifications.service.notification_validators import (
     convert_to_utc,
@@ -17,6 +20,10 @@ from app.notifications.service.notification_validators import (
     validate_scheduled_at,
     validate_timezone,
 )
+
+
+def generate_idempotency_key() -> str:
+    return f"notif_{secrets.token_urlsafe(24)}"
 
 
 def create_notification(db: Session, notification_data: NotificationCreate) -> NotificationORM:
@@ -37,6 +44,7 @@ def create_notification(db: Session, notification_data: NotificationCreate) -> N
         scheduled_at=scheduled_at_utc,
         timezone=notification_data.timezone,
         status=NotificationStatus.PENDING.value,
+        idempotency_key=generate_idempotency_key(),
     )
 
     return add_notification(db, notification)
@@ -65,4 +73,20 @@ def update_notification_status(db: Session, notification_id: int, new_status: No
         )
 
     notification.status = new_status.value
+    return save_notification(db, notification)
+
+
+def execute_notification(db: Session, notification_id: int) -> NotificationORM:
+    notification = get_notification_or_raise(db, notification_id)
+    current_status = NotificationStatus(notification.status)
+
+    if current_status != NotificationStatus.PENDING:
+        raise ValueError("Wykonac mozna wylacznie powiadomienie w statusie PENDING.")
+
+    try:
+        dispatch_notification(notification)
+        notification.status = NotificationStatus.SENT.value
+    except Exception:
+        notification.status = NotificationStatus.FAILED.value
+
     return save_notification(db, notification)

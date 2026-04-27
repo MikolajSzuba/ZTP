@@ -1,0 +1,217 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[polish]{babel}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{enumitem}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{Sprawozdanie Projekt 2 - System planowania i obsługi powiadomień}}\\[1.5em]
+\end{center}
+
+\textbf{Numer albumu: \underline{\hspace{4cm}}}
+
+\textbf{Imię: \underline{\hspace{5cm}}}
+
+\textbf{Nazwisko: \underline{\hspace{4.7cm}}}
+
+\textbf{Grupa: \underline{\hspace{5.4cm}}}
+
+\vspace{1em}
+
+\section*{1. Wstęp}
+\subsection*{a) Opis struktury projektu - Moduł Notifications}
+
+Moduł \texttt{Notifications} jest podzielony na warstwy:
+\begin{itemize}[leftmargin=1.5em]
+    \item \texttt{web/} -- endpointy API i obsługa żądań HTTP,
+    \item \texttt{service/} -- logika biznesowa (walidacje, statusy, wykonanie),
+    \item \texttt{data/} -- komunikacja z bazą danych,
+    \item \texttt{model/} -- modele ORM i schematy odpowiedzi.
+\end{itemize}
+
+Najważniejsze modele w module to rekord powiadomienia i statusy/kanały. Warstwa \texttt{model} trzyma też schematy wejścia i wyjścia API, więc od razu wiadomo jakie pola przyjmujemy i co zwracamy.
+
+W katalogu \texttt{service} są osobne pliki dla:
+\begin{itemize}[leftmargin=1.5em]
+    \item walidacji danych i czasu,
+    \item maszyny stanów,
+    \item dispatchera i delivery (faktyczna wysyłka),
+    \item workera cyklicznego.
+\end{itemize}
+
+Taki podział jest wygodny do dalszego rozwoju, bo da się łatwo podmienić np. sposób wysyłki bez ruszania endpointów.
+
+\section*{2. Interaktywna dokumentacja}
+
+Dokumentacja jest zrobiona przez Swagger UI w FastAPI. Po uruchomieniu projektu można testować endpointy bezpośrednio z poziomu przeglądarki.
+
+W dokumentacji widoczne są między innymi endpointy:
+\begin{itemize}[leftmargin=1.5em]
+    \item \texttt{POST /api/v1/notifications},
+    \item \texttt{GET /api/v1/notifications},
+    \item \texttt{GET /api/v1/notifications/\{id\}},
+    \item \texttt{POST /api/v1/notifications/\{id\}/send-now},
+    \item \texttt{POST /api/v1/notifications/process-ready},
+    \item \texttt{GET /api/v1/metrics}.
+\end{itemize}
+
+Dzięki Swagger UI można od razu:
+\begin{itemize}[leftmargin=1.5em]
+    \item zobaczyć wymagane pola requestu,
+    \item sprawdzić przykładowe odpowiedzi i kody HTTP,
+    \item przetestować ręcznie scenariusze typu create -> send-now -> metrics.
+\end{itemize}
+
+To bardzo przyspiesza debugowanie, bo nie trzeba za każdym razem pisać ręcznie requestów.
+
+\section*{3. Moduł planowania i obsługi powiadomień}
+
+\subsection*{a) Architektura warstwowa (Controller -> Service -> Repository)}
+
+Przepływ wygląda prosto:
+\begin{enumerate}[leftmargin=1.8em]
+    \item Controller odbiera żądanie HTTP.
+    \item Service robi walidację i logikę biznesową.
+    \item Repository zapisuje/odczytuje dane z bazy.
+    \item Wynik wraca do klienta jako odpowiedź JSON.
+\end{enumerate}
+
+W praktyce wygląda to tak:
+\begin{itemize}[leftmargin=1.5em]
+    \item Controller nie zawiera logiki biznesowej, tylko mapuje błędy na kody HTTP (np. 404, 422).
+    \item Service robi całą logikę: walidacja treści, walidacja odbiorcy, sprawdzanie czasu, ustawianie statusów.
+    \item Repository ma proste funkcje typu \texttt{add}, \texttt{get\_by\_id}, \texttt{get\_ready}, \texttt{count\_by\_status}.
+\end{itemize}
+
+Taki układ ogranicza bałagan i ułatwia testowanie warstw osobno.
+
+\subsection*{b) Maszyna stanów}
+
+Powiadomienie może mieć statusy: \texttt{PENDING}, \texttt{SENT}, \texttt{FAILED}, \texttt{CANCELLED}.
+
+W serwisie jest sprawdzanie dozwolonych przejść statusów. Dzięki temu nie da się przypadkowo zrobić niedozwolonej zmiany.
+
+Przykładowe zasady:
+\begin{itemize}[leftmargin=1.5em]
+    \item wysyłkę (\texttt{send-now}) można wykonać tylko dla \texttt{PENDING},
+    \item jeżeli delivery przejdzie poprawnie, status zmienia się na \texttt{SENT},
+    \item jeżeli delivery rzuci wyjątek, status przechodzi na \texttt{FAILED},
+    \item rekordów już wysłanych/anulowanych nie można ponownie wysłać.
+\end{itemize}
+
+To zabezpiecza system przed „skakaniem” po statusach w sposób nielogiczny.
+
+\subsection*{c) Kanały komunikacji}
+
+\subsubsection*{i. Powiadomienia PUSH}
+
+Kanał PUSH działa przez wysłanie HTTP POST do lokalnego \texttt{ntfy}. Dispatcher wybiera kanał na podstawie pola \texttt{channel}.
+
+\texttt{Ntfy.sh} to proste narzędzie do testowania powiadomień push. Dla laboratorium jest wygodne, bo od razu widać dostarczone wiadomości.
+
+Implementacja w skrócie:
+\begin{itemize}[leftmargin=1.5em]
+    \item service pobiera rekord i wywołuje dispatcher,
+    \item dispatcher dla \texttt{PUSH} wywołuje funkcję delivery,
+    \item delivery robi request do \texttt{http://localhost:8088/\{topic\}}.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width=0.9\textwidth]{ntfy_screenshot.png}
+    \caption{Placeholder: zrzut z ntfy (zaplanowane i dostarczone powiadomienie + Swagger UI).}
+\end{figure}
+
+\subsubsection*{ii. Powiadomienia Email}
+
+Kanał email działa przez MailHog (lokalny SMTP). Serwis delivery buduje wiadomość i wysyła ją na \texttt{localhost:1025}.
+
+\texttt{MailHog} pozwala podejrzeć wysłane maile lokalnie, bez używania prawdziwej skrzynki.
+
+Implementacja w skrócie:
+\begin{itemize}[leftmargin=1.5em]
+    \item dispatcher wykrywa kanał \texttt{EMAIL},
+    \item delivery tworzy wiadomość (subject, from, to, content),
+    \item wiadomość trafia do MailHog, gdzie można ją od razu podejrzeć w UI.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width=0.9\textwidth]{mailhog_screenshot.png}
+    \caption{Placeholder: zrzut z MailHog (dostarczone zaplanowane powiadomienie + Swagger UI).}
+\end{figure}
+
+\subsection*{d) Worker cykliczny}
+
+Worker działa w tle równolegle do API (osobny wątek uruchamiany razem z aplikacją). Co kilka sekund pobiera rekordy gotowe do realizacji i je przetwarza. Dzięki temu powiadomienia mogą wysyłać się automatycznie.
+
+Cykl działania workera:
+\begin{enumerate}[leftmargin=1.8em]
+    \item otwarcie sesji DB,
+    \item pobranie rekordów \texttt{PENDING} z \texttt{scheduled\_at <= teraz\_utc},
+    \item próba realizacji każdego rekordu,
+    \item zapis nowego statusu,
+    \item zamknięcie sesji i sleep (np. 5 sekund).
+\end{enumerate}
+
+W projekcie worker startuje razem z aplikacją, więc nie trzeba go uruchamiać ręcznie osobnym poleceniem.
+
+\subsection*{e) Planowanie czasowe}
+
+Czas zaplanowanej wysyłki jest konwertowany do UTC i porównywany z bieżącym czasem UTC (logika jak dla \texttt{DateTime.UtcNow}). Dzięki temu strefy czasowe użytkowników nie psują logiki harmonogramu.
+
+Najważniejsze zasady:
+\begin{itemize}[leftmargin=1.5em]
+    \item przy wejściu przyjmujemy datę lokalną + nazwę strefy,
+    \item przed zapisem konwertujemy do UTC i taką wartość trzymamy w DB,
+    \item walidacja odrzuca datę z przeszłości,
+    \item worker i metody wykonawcze porównują tylko względem UTC.
+\end{itemize}
+
+Dzięki temu niezależnie od lokalnej strefy użytkownika logika „czy rekord jest gotowy do wysyłki” działa spójnie.
+
+\subsection*{f) Idempotencja}
+
+Idempotencja jest potrzebna, żeby nie tworzyć podwójnych powiadomień przy ponowieniu żądania (np. po błędzie sieci).
+
+W implementacji każde powiadomienie ma unikalny \texttt{idempotency\_key}. Klucz jest trzymany w bazie jako wartość unikalna.
+
+Korzyści:
+\begin{itemize}[leftmargin=1.5em]
+    \item łatwiej wykryć duplikaty,
+    \item można bezpieczniej ponawiać operacje po problemie sieciowym,
+    \item łatwiej śledzić konkretną operację w logach i debugowaniu.
+\end{itemize}
+
+W projekcie klucz jest generowany po stronie backendu i zwracany w odpowiedzi API.
+
+\section*{4. Prometheus}
+
+Prometheus zbiera metryki z endpointu \texttt{/api/v1/metrics}. Dzięki temu można obserwować np. liczbę rekordów \texttt{PENDING}, \texttt{SENT}, \texttt{FAILED}, \texttt{CANCELLED} oraz podział po kanałach.
+
+W praktyce metryki pomagają szybko ocenić stan systemu:
+\begin{itemize}[leftmargin=1.5em]
+    \item czy rośnie liczba \texttt{FAILED},
+    \item czy kolejka \texttt{PENDING} nie stoi zbyt długo,
+    \item jak rozkłada się ruch między \texttt{PUSH} i \texttt{EMAIL}.
+\end{itemize}
+
+Po uruchomieniu dockera i aplikacji Prometheus odpytuje endpoint cyklicznie i pokazuje wyniki w zakładkach \texttt{Table} i \texttt{Graph}.
+
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width=0.95\textwidth]{prometheus_chart.png}
+    \caption{Placeholder: wykres metryk i statystyk w Prometheus.}
+\end{figure}
+
+\end{document}

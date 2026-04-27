@@ -12,6 +12,25 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog_ztp
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+  ntfy:
+    image: binwiederhier/ntfy
+    container_name: ntfy_ztp
+    command: serve
+    ports:
+      - "8088:80"
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus_ztp
+    volumes:
+      - ./.config/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
 
 volumes:
   pgdata:

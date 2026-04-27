@@ -6,5 +6,13 @@ CREATE TABLE IF NOT EXISTS notifications (
     scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL,
     timezone VARCHAR NOT NULL,
     status VARCHAR NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    idempotency_key VARCHAR UNIQUE NOT NULL
 );
+
+INSERT INTO notifications (content, channel, recipient, scheduled_at, timezone, status, idempotency_key)
+VALUES
+    ('Powiadomienie testowe PUSH', 'PUSH', 'demo-user', NOW() + INTERVAL '10 minutes', 'Europe/Warsaw', 'PENDING', 'seed_pending_push_1'),
+    ('Powiadomienie testowe EMAIL', 'EMAIL', 'demo@example.com', NOW() - INTERVAL '5 minutes', 'Europe/Warsaw', 'SENT', 'seed_sent_email_1'),
+    ('Anulowane powiadomienie', 'PUSH', 'demo-user-2', NOW() + INTERVAL '20 minutes', 'Europe/Warsaw', 'CANCELLED', 'seed_cancelled_push_1')
+ON CONFLICT (idempotency_key) DO NOTHING;
