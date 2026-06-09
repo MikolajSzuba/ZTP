@@ -1,0 +1,8 @@
+{
+  "short_name": "ZTP",
+  "name": "Sklep ZTP",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#102a43",
+  "background_color": "#ffffff"
+}

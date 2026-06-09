@@ -16,6 +16,7 @@ from app.REST.model.product_schema import ProductCreate, ProductUpdate
 from app.REST.model.product_history_orm import ProductHistoryORM
 from app.REST.service.product_validators import (
     validate_price_not_negative,
+    validate_stock_not_negative,
     validate_product_banned_names,
     validate_category_exist,
     validate_product_unique_name_in_category,
@@ -29,6 +30,7 @@ def _build_product_snapshot(product: ProductORM) -> dict:
         "id": product.id,
         "name": product.name,
         "price": float(product.price) if product.price is not None else None,
+        "stock_quantity": product.stock_quantity,
         "category": {
             "id": category.id if category is not None else None,
             "name": category.name if category is not None else None,
@@ -54,6 +56,7 @@ def _save_product_history(
 def _validate_product_full_data(db: Session, payload: ProductCreate, product_id: int | None = None):
 
     validate_price_not_negative(payload.price)
+    validate_stock_not_negative(payload.stock_quantity)
     validate_product_banned_names(db, payload.name)
     category = validate_category_exist(db, payload.category_id)
     validate_product_unique_name_in_category(db, payload.name, payload.category_id, product_id)
@@ -79,6 +82,7 @@ def create_product(db: Session, payload: ProductCreate):
         name=payload.name,
         category_id=payload.category_id,
         price=payload.price,
+        stock_quantity=payload.stock_quantity,
     )
     created_product = add_product(db, product)
 
@@ -107,6 +111,7 @@ def replace_product(db: Session, product_id: int, payload: ProductCreate):
     product.name = payload.name
     product.category_id = payload.category_id
     product.price = payload.price
+    product.stock_quantity = payload.stock_quantity
 
     updated_product = save_product(db, product)
 
@@ -138,6 +143,9 @@ def patch_product(db: Session, product_id: int, payload: ProductUpdate):
     if payload.price is not None:
         validate_price_not_negative(payload.price)
         product.price = payload.price
+    if payload.stock_quantity is not None:
+        validate_stock_not_negative(payload.stock_quantity)
+        product.stock_quantity = payload.stock_quantity
 
     target_name = payload.name if payload.name is not None else product.name
     target_category_id = payload.category_id if payload.category_id is not None else product.category_id

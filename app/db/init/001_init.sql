@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS products (
     name VARCHAR NOT NULL,
     category_id INTEGER NOT NULL REFERENCES categories(id),
     price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
+    stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
     UNIQUE (name, category_id)
 );
 
@@ -44,10 +45,10 @@ ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO products (name, category_id, price)
 VALUES
-    ('Laptop', (SELECT id FROM categories WHERE name = 'Elektronika'), 3499.99),
-    ('Smartfon', (SELECT id FROM categories WHERE name = 'Elektronika'), 1999.00),
-    ('Kawa ziarnista', (SELECT id FROM categories WHERE name = 'Spożywcze'), 49.90),
-    ('Herbata zielona', (SELECT id FROM categories WHERE name = 'Spożywcze'), 12.50),
-    ('Biurko', (SELECT id FROM categories WHERE name = 'Meble'), 599.00),
-    ('Krzesło obrotowe', (SELECT id FROM categories WHERE name = 'Meble'), 399.99)
+    ('Laptop', (SELECT id FROM categories WHERE name = 'Elektronika'), 3499.99, 25),
+    ('Smartfon', (SELECT id FROM categories WHERE name = 'Elektronika'), 1999.00, 40),
+    ('Kawa ziarnista', (SELECT id FROM categories WHERE name = 'Spożywcze'), 49.90, 120),
+    ('Herbata zielona', (SELECT id FROM categories WHERE name = 'Spożywcze'), 12.50, 200),
+    ('Biurko', (SELECT id FROM categories WHERE name = 'Meble'), 599.00, 15),
+    ('Krzesło obrotowe', (SELECT id FROM categories WHERE name = 'Meble'), 399.99, 30)
 ON CONFLICT (name, category_id) DO NOTHING;

@@ -14,17 +14,20 @@ class ProductCreate(BaseModel):
     name:str
     category_id: int
     price:float
+    stock_quantity: int = 0
         
 class ProductUpdate(BaseModel):
     name:str | None=None
     category_id: int | None=None
     price:float | None=None
+    stock_quantity: int | None = None
         
 class Product(BaseModel):
     id: int
     name: str
     category: Category
     price: float
+    stock_quantity: int
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -14,6 +14,11 @@ class ResourceNotFoundError(Exception):
 def validate_price_not_negative(price: int):
     if price <0:
         raise ValidationError("Cena nie moze byc ujemna")
+
+
+def validate_stock_not_negative(stock_quantity: int):
+    if stock_quantity < 0:
+        raise ValidationError("Stan magazynowy nie moze byc ujemny")
     
 def validate_category_exist(db, category_id: int):
     category = get_category_by_id(db, category_id)

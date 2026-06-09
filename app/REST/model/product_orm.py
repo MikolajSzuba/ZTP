@@ -11,5 +11,6 @@ class ProductORM(Base):
     name: Mapped[str] = mapped_column(String)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
     price: Mapped[float] = mapped_column(Numeric(10, 2))
+    stock_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     category = relationship("CategoryORM")

@@ -21,6 +21,8 @@ from app.REST.model.category_orm import CategoryORM
 from app.REST.model.product_history_orm import ProductHistoryORM
 from app.REST.model.product_orm import ProductORM
 from app.REST.data.database import Base
+from app.identity.model.operator_orm import OperatorORM  # noqa: F401
+from app.identity.model.operator_session_orm import OperatorSessionORM  # noqa: F401
 
 
 @pytest.fixture(scope="session", autouse=True)
